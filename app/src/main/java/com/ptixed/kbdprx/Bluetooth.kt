@@ -5,13 +5,13 @@ import android.bluetooth.*
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
-import android.content.Context
 import android.util.Log
 import java.util.*
 
 @SuppressLint("MissingPermission")
 class Bluetooth: BluetoothGattServerCallback
 {
+    private var activity: MainActivity
     private var bleman: BluetoothManager
     private var gatt: BluetoothGattServer
     private var hidReport: BluetoothGattCharacteristic
@@ -35,11 +35,12 @@ class Bluetooth: BluetoothGattServerCallback
     }
     private var disconnectCallback = object: AdvertiseCallback() { }
 
-    constructor(context: Context, bleman: BluetoothManager, map: ByteArray)
+    constructor(activity: MainActivity, bleman: BluetoothManager, map: ByteArray)
     {
         // TODO: add documentation (...link?)
+        this.activity = activity
         this.bleman = bleman
-        gatt = bleman.openGattServer(context, this)
+        gatt = bleman.openGattServer(activity, this)
 
         var hid = BluetoothGattService(UUID.fromString("00001812-0000-1000-8000-00805F9B34FB"), BluetoothGattService.SERVICE_TYPE_PRIMARY)
 
@@ -93,6 +94,7 @@ class Bluetooth: BluetoothGattServerCallback
 
     fun destroy()
     {
+        activity.setStatus("Off")
         bleman.adapter.bluetoothLeAdvertiser.stopAdvertising(disconnectCallback)
         gatt.close()
     }
@@ -125,18 +127,19 @@ class Bluetooth: BluetoothGattServerCallback
             2 -> {
                 serviceState = 3
 
-                val settings = AdvertiseSettings.Builder()
+                var settings = AdvertiseSettings.Builder()
                     .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
                     .setConnectable(true)
                     .setTimeout(0)
                     .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
                     .build()
 
-                val data = AdvertiseData.Builder()
+                var data = AdvertiseData.Builder()
                     .setIncludeDeviceName(true)
                     //.addServiceUuid(ParcelUuid(hid.uuid)) // causes ADVERTISE_FAILED_DATA_TOO_LARGE
                     .build()
 
+                activity.setStatus("Advertising")
                 bleman.adapter.bluetoothLeAdvertiser.startAdvertising(settings, data, connectCallback)
             }
         }
@@ -182,6 +185,8 @@ class Bluetooth: BluetoothGattServerCallback
         Log.i(this::class.simpleName, "${this::onConnectionStateChange.name} $status $newState")
 
         bleman.adapter.bluetoothLeAdvertiser.stopAdvertising(disconnectCallback)
+        activity.setStatus("Paired")
+
         if (newState == BluetoothProfile.STATE_CONNECTED)
             this.device = device
         else if (this.device == device && newState == BluetoothProfile.STATE_DISCONNECTED)
